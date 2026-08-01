@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#FF7A45">
+<title>あんざんチャレンジ</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon.png" type="image/png">
+<link rel="apple-touch-icon" href="icon.svg">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+
+  <!-- ==================== トップ画面 ==================== -->
+  <section id="screen-top" class="screen active">
+    <svg class="mascot big bounce" id="mascotTop" viewBox="0 0 120 120"><use href="#mascot-normal"/></svg>
+    <div class="title">あんざん<br>チャレンジ</div>
+    <div class="sub">タップしてスタート！</div>
+    <button class="big-btn" style="margin-top:18px; width:80%;" onclick="App.goUserSelect()">▶ はじめる</button>
+  </section>
+
+  <!-- ==================== ユーザ選択画面 ==================== -->
+  <section id="screen-user" class="screen">
+    <div class="top-bar">
+      <div><h2>だれがやる？</h2></div>
+      <button class="icon-btn" onclick="App.openUserEdit()">⚙</button>
+    </div>
+    <div class="user-list" id="userList"></div>
+  </section>
+
+  <!-- ==================== モード選択画面 ==================== -->
+  <section id="screen-mode" class="screen">
+    <div class="top-bar">
+      <button class="icon-btn" onclick="App.goUserSelect()">←</button>
+      <h2 id="modeUserLabel" style="font-size:18px;"></h2>
+      <div style="width:44px;"></div>
+    </div>
+    <div class="panel-title">けいさんのしゅるい</div>
+    <div class="mode-grid" id="modeGrid"></div>
+    <div class="panel-title">なんいど</div>
+    <div class="diff-row" id="diffRow">
+      <button class="diff-btn" data-diff="easy" onclick="App.selectDifficulty('easy')">かんたん</button>
+      <button class="diff-btn" data-diff="normal" onclick="App.selectDifficulty('normal')">ふつう</button>
+      <button class="diff-btn" data-diff="hard" onclick="App.selectDifficulty('hard')">むずかしい</button>
+    </div>
+    <button class="big-btn" id="startBtn" style="margin-top:22px;" disabled onclick="App.startCalc()">けってい</button>
+    <button class="big-btn ghost" style="margin-top:10px;" onclick="App.goHistory()">📊 けっかをみる</button>
+  </section>
+
+  <!-- ==================== 過去の結果 画面 ==================== -->
+  <section id="screen-history" class="screen">
+    <div class="top-bar">
+      <button class="icon-btn" onclick="App.goModeSelect()">←</button>
+      <h2 id="historyUserLabel" style="font-size:18px;"></h2>
+      <div style="width:44px;"></div>
+    </div>
+    <div class="history-content" id="historyContent"></div>
+  </section>
+
+  <!-- ==================== 計算画面 ==================== -->
+  <section id="screen-calc" class="screen">
+    <div class="calc-top">
+      <div class="progress-pill" id="progressLabel">1 / 20</div>
+      <div class="timer-pill" id="timerLabel">0:00</div>
+    </div>
+    <div class="progress-bar-track"><div class="progress-bar-fill" id="progressFill"></div></div>
+
+    <div class="problem-card">
+      <div class="problem-text" id="problemText">-</div>
+      <div class="answer-box placeholder" id="answerBox">こたえ</div>
+    </div>
+
+    <div class="keypad" id="keypad">
+      <button class="key" data-k="7">7</button>
+      <button class="key" data-k="8">8</button>
+      <button class="key" data-k="9">9</button>
+      <button class="key" data-k="4">4</button>
+      <button class="key" data-k="5">5</button>
+      <button class="key" data-k="6">6</button>
+      <button class="key" data-k="1">1</button>
+      <button class="key" data-k="2">2</button>
+      <button class="key" data-k="3">3</button>
+      <button class="key func" data-k="clear">C</button>
+      <button class="key" data-k="0">0</button>
+      <button class="key func" data-k="back">⌫</button>
+    </div>
+    <button class="confirm-btn" id="confirmBtn" disabled>かくてい</button>
+
+    <div class="feedback-overlay" id="feedbackOverlay">
+      <svg class="mascot" id="mascotFeedback" viewBox="0 0 120 120"><use href="#mascot-normal"/></svg>
+      <div class="feedback-mark pop-in" id="feedbackMark"></div>
+      <div class="feedback-sub" id="feedbackSub"></div>
+    </div>
+  </section>
+
+  <!-- ==================== 結果画面 ==================== -->
+  <section id="screen-result" class="screen">
+    <h2 id="resultTitle" style="text-align:center;">けっか</h2>
+    <div class="result-summary">
+      <div class="summary-card"><div class="num" id="resScore">-</div><div class="lbl">せいかい</div></div>
+      <div class="summary-card"><div class="num" id="resTime">-</div><div class="lbl">タイム</div></div>
+      <div class="summary-card"><div class="num" id="resRate">-</div><div class="lbl">せいかいりつ</div></div>
+    </div>
+    <div class="result-list" id="resultList"></div>
+    <div class="result-actions">
+      <button class="big-btn secondary" onclick="App.goModeSelect()">もういちど</button>
+      <button class="big-btn" onclick="App.goUserSelect()">ユーザ選択へ</button>
+    </div>
+  </section>
+
+  <!-- ==================== ユーザ名編集モーダル ==================== -->
+  <div class="modal-backdrop" id="userEditModal">
+    <div class="modal-sheet">
+      <h3>ユーザーめい</h3>
+      <p class="modal-hint">名前を変えたい場合は <code>users.js</code> を編集してください。保存すると次にアプリを開いたときに反映されます。</p>
+      <div id="userEditRows"></div>
+      <div class="modal-actions">
+        <button class="big-btn ghost" style="width:100%;" onclick="App.exportUsers()">⬇ 今のユーザー情報を書き出す</button>
+      </div>
+      <div class="modal-actions">
+        <button class="big-btn" style="width:100%;" onclick="App.closeUserEdit()">とじる</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+</div>
+
+<!-- マスコットSVGシンボル定義 -->
+<svg width="0" height="0" style="position:absolute;">
+  <symbol id="mascot-normal" viewBox="0 0 120 120">
+    <circle cx="60" cy="60" r="54" fill="#FFC93C"/>
+    <circle cx="42" cy="55" r="8" fill="#23324D"/>
+    <circle cx="78" cy="55" r="8" fill="#23324D"/>
+    <path d="M42 78 Q60 92 78 78" stroke="#23324D" stroke-width="6" fill="none" stroke-linecap="round"/>
+  </symbol>
+  <symbol id="mascot-happy" viewBox="0 0 120 120">
+    <circle cx="60" cy="60" r="54" fill="#3DDC84"/>
+    <path d="M32 52 Q42 42 52 52" stroke="#23324D" stroke-width="6" fill="none" stroke-linecap="round"/>
+    <path d="M68 52 Q78 42 88 52" stroke="#23324D" stroke-width="6" fill="none" stroke-linecap="round"/>
+    <path d="M38 74 Q60 100 82 74" stroke="#23324D" stroke-width="7" fill="none" stroke-linecap="round"/>
+  </symbol>
+  <symbol id="mascot-sad" viewBox="0 0 120 120">
+    <circle cx="60" cy="60" r="54" fill="#FF9AA5"/>
+    <circle cx="42" cy="58" r="8" fill="#23324D"/>
+    <circle cx="78" cy="58" r="8" fill="#23324D"/>
+    <path d="M42 88 Q60 74 78 88" stroke="#23324D" stroke-width="6" fill="none" stroke-linecap="round"/>
+  </symbol>
+</svg>
+
+<script src="config.js"></script>
+<script src="users.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

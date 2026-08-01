@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120">
+  <rect width="120" height="120" rx="26" fill="#FF7A45"/>
+  <circle cx="60" cy="58" r="38" fill="#FFC93C"/>
+  <circle cx="46" cy="52" r="6" fill="#23324D"/>
+  <circle cx="74" cy="52" r="6" fill="#23324D"/>
+  <path d="M44 70 Q60 82 76 70" stroke="#23324D" stroke-width="5" fill="none" stroke-linecap="round"/>
+  <text x="60" y="110" font-family="'M PLUS Rounded 1c', sans-serif" font-size="16" font-weight="800" fill="#FFFFFF" text-anchor="middle">+&#8722;&#215;&#247;</text>
+</svg>
