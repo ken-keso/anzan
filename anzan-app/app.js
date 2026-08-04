@@ -12,6 +12,7 @@
     {id:3, name:"けんた"}
   ];
   const LS_RESULTS_PREFIX = "anzan_results_"; // + userId
+  const LS_STAMPS_PREFIX = "anzan_stamps_"; // + userId（モード・なんいどに関わらず共通で蓄積）
 
   const MODE_LABELS = {add:"たしざん", sub:"ひきざん", mul:"かけざん", div:"わりざん"};
   const MODE_ICONS  = {add:"➕", sub:"➖", mul:"✖️", div:"➗"};
@@ -213,6 +214,22 @@
     }catch(e){ /* 音が出せない環境は無視 */ }
   }
 
+  // スタンプゲット音：高音のベルを連打しながら駆け上がり、
+  // 最後にキラキラのノイズスパークルで締める、ひときわ派手な一撃。
+  function playStampSound(){
+    try{
+      const ctx = audioCtx();
+      const run = [783.99, 987.77, 1174.66, 1567.98, 2093.00]; // G5 B5 D6 G6 C7
+      run.forEach((f,i)=>{
+        const start = i*0.09;
+        tone(ctx, f,   start, 0.30, {type:"triangle", peakGain:0.26});
+        tone(ctx, f*2, start, 0.20, {type:"sine",     peakGain:0.08});
+      });
+      noiseBurst(ctx, run.length*0.09, 0.45, {peakGain:0.16, filterType:"highpass", filterFreq:6500, Q:0.6});
+      noiseBurst(ctx, run.length*0.09+0.08, 0.35, {peakGain:0.12, filterType:"highpass", filterFreq:8000, Q:0.5});
+    }catch(e){ /* 音が出せない環境は無視 */ }
+  }
+
   /* ---------- ユーザ管理（users.js を起動のたびに必ず反映） ---------- */
   function loadUsers(){
     const fileUsers = (window.APP_USERS && Array.isArray(window.APP_USERS)) ? window.APP_USERS : null;
@@ -368,6 +385,21 @@
     localStorage.setItem(LS_RESULTS_PREFIX+userId, JSON.stringify(store));
   }
 
+  /* ---------- スタンプ（まんてん獲得で蓄積。モード・なんいど共通） ---------- */
+  function loadStampCount(userId){
+    const raw = localStorage.getItem(LS_STAMPS_PREFIX+userId);
+    const n = raw != null ? parseInt(raw, 10) : 0;
+    return (isNaN(n) || n < 0) ? 0 : n;
+  }
+  function saveStampCount(userId, count){
+    localStorage.setItem(LS_STAMPS_PREFIX+userId, String(count));
+  }
+  function addStamp(userId){
+    const n = loadStampCount(userId) + 1;
+    saveStampCount(userId, n);
+    return n;
+  }
+
   /* ---------- マスコット表情 ---------- */
   function setMascot(elId, symbol){
     document.getElementById(elId).querySelector("use").setAttribute("href", "#"+symbol);
@@ -387,6 +419,9 @@
     },
 
     /* ---- 画面遷移 ---- */
+    goTop(){
+      showScreen("screen-top");
+    },
     goUserSelect(){
       renderUserList();
       showScreen("screen-user");
@@ -407,6 +442,7 @@
 
     goHistory(){
       document.getElementById("historyUserLabel").textContent = state.currentUser.name + "さんの きろく";
+      renderStampPanel();
       renderHistory();
       showScreen("screen-history");
     },
@@ -507,6 +543,24 @@
       };
       grid.appendChild(card);
     });
+  }
+
+  /* ---------- スタンプパネル（過去の結果 画面） ---------- */
+  function renderStampPanel(){
+    const count = loadStampCount(state.currentUser.id);
+    document.getElementById("stampPanelCount").textContent = count;
+    const grid = document.getElementById("stampPanelGrid");
+    grid.innerHTML = "";
+    if(count === 0){
+      grid.innerHTML = '<span class="stamp-empty">まんてんをとって スタンプをあつめよう！</span>';
+      return;
+    }
+    for(let i=0;i<count;i++){
+      const s = document.createElement("span");
+      s.className = "stamp-icon";
+      s.textContent = "🏅";
+      grid.appendChild(s);
+    }
   }
 
   /* ---------- 過去の結果 画面 ---------- */
@@ -639,6 +693,34 @@
     clearInterval(state.timerId);
   }
 
+  /* ---------- スタンプゲット演出 ---------- */
+  function showStampGetEffect(){
+    const overlay = document.getElementById("stampGetOverlay");
+
+    // 既存のスパーク要素を掃除してから、飛び散る星をランダムに生成
+    overlay.querySelectorAll(".stamp-spark").forEach(el=>el.remove());
+    const sparkChars = ["✨","⭐","🎉"];
+    const sparkCount = 14;
+    for(let i=0;i<sparkCount;i++){
+      const s = document.createElement("span");
+      s.className = "stamp-spark";
+      s.textContent = sparkChars[i % sparkChars.length];
+      const angle = (Math.PI*2/sparkCount)*i + (Math.random()*0.4-0.2);
+      const dist = 110 + Math.random()*70;
+      s.style.setProperty("--sx", Math.cos(angle)*dist + "px");
+      s.style.setProperty("--sy", Math.sin(angle)*dist + "px");
+      s.style.animationDelay = (0.05 + Math.random()*0.15) + "s";
+      overlay.appendChild(s);
+    }
+
+    overlay.classList.add("show");
+    playStampSound();
+
+    setTimeout(()=>{
+      overlay.classList.remove("show");
+    }, 2400);
+  }
+
   /* ---------- 結果画面 ---------- */
   function finishSession(){
     stopTimer();
@@ -659,6 +741,12 @@
       details: state.results
     };
     saveUserSession(state.currentUser.id, session);
+
+    // まんてん（全問正解）ならスタンプを1つ加算
+    const isPerfect = correctCount === state.totalQuestions;
+    if(isPerfect){
+      addStamp(state.currentUser.id);
+    }
 
     document.getElementById("resultTitle").textContent =
       state.currentUser.name+"さんの けっか（"+MODE_LABELS[state.mode]+" / "+DIFF_LABELS[state.difficulty]+"）";
@@ -682,6 +770,11 @@
 
     showScreen("screen-result");
     playResultFanfare();
+
+    if(isPerfect){
+      // ファンファーレと少し重ねつつ、スタンプ演出をひときわ派手に表示
+      setTimeout(showStampGetEffect, 600);
+    }
   }
 
   /* ---------- Service Worker（PWA。file://では登録スキップ） ---------- */

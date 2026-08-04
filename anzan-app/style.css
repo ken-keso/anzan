@@ -133,6 +133,23 @@
 
   .panel-title{ font-size:15px; color:var(--ink-soft); font-weight:800; margin:18px 0 4px; }
 
+  /* ---------- スタンプパネル（過去の結果画面） ---------- */
+  .stamp-panel{
+    background:linear-gradient(135deg,#FFF6E5,#FFF);
+    border-radius:var(--radius); box-shadow:var(--shadow-sm);
+    padding:14px 16px; margin-bottom:14px; flex-shrink:0;
+    border:3px solid var(--yellow);
+  }
+  .stamp-panel-title{ font-size:14px; font-weight:800; color:var(--ink-soft); }
+  .stamp-panel-count{ font-size:28px; font-weight:800; color:var(--primary-dark); margin:2px 0 8px; }
+  .stamp-panel-count span{ font-size:28px; }
+  .stamp-panel-grid{
+    display:flex; flex-wrap:wrap; gap:6px;
+    max-height:88px; overflow-y:auto;
+  }
+  .stamp-panel-grid .stamp-icon{ font-size:26px; line-height:1; }
+  .stamp-panel-grid .stamp-empty{ font-size:13px; color:#9AA7C2; font-weight:700; }
+
   /* ---------- 過去の結果画面 ---------- */
   .history-content{ flex:1; overflow-y:auto; padding-bottom:8px; }
   .history-mode{ margin-bottom:18px; }
@@ -276,6 +293,50 @@
   .modal-actions{ display:flex; gap:10px; margin-top:16px; }
   .modal-actions .big-btn{ flex:1; padding:14px; font-size:16px; }
   .file-input-hidden{ display:none; }
+
+  /* ---------- スタンプゲット演出（結果画面） ---------- */
+  .stamp-get-overlay{
+    position:absolute; inset:0; display:none;
+    align-items:center; justify-content:center; flex-direction:column; gap:12px;
+    background:radial-gradient(circle at 50% 40%, #FFF6D9, #FFC93C 85%);
+    z-index:25; overflow:hidden;
+  }
+  .stamp-get-overlay.show{ display:flex; }
+  .stamp-get-burst{
+    font-size:130px; line-height:1;
+    filter:drop-shadow(0 6px 0 rgba(232,93,42,0.35));
+    animation: stampPop .55s cubic-bezier(.34,1.56,.64,1), stampWobble 1s ease-in-out .55s infinite alternate;
+  }
+  .stamp-get-text{
+    font-size:26px; font-weight:800; text-align:center; line-height:1.35;
+    color:var(--primary-dark);
+    text-shadow:2px 2px 0 #fff, -2px -2px 0 #fff, 2px -2px 0 #fff, -2px 2px 0 #fff;
+    animation: stampTextPop .5s ease .15s both;
+  }
+  @keyframes stampPop{
+    0%{ transform:scale(0) rotate(-35deg); opacity:0; }
+    70%{ transform:scale(1.15) rotate(8deg); opacity:1; }
+    100%{ transform:scale(1) rotate(0deg); opacity:1; }
+  }
+  @keyframes stampWobble{
+    from{ transform:rotate(-6deg); }
+    to{ transform:rotate(6deg); }
+  }
+  @keyframes stampTextPop{
+    from{ transform:translateY(18px); opacity:0; }
+    to{ transform:translateY(0); opacity:1; }
+  }
+  .stamp-spark{
+    position:absolute; top:50%; left:50%;
+    font-size:22px;
+    opacity:0;
+    animation: sparkFly .9s ease-out forwards;
+    pointer-events:none;
+  }
+  @keyframes sparkFly{
+    0%{ transform:translate(-50%,-50%) scale(0.4); opacity:1; }
+    100%{ transform:translate(calc(-50% + var(--sx)), calc(-50% + var(--sy))) scale(1.1); opacity:0; }
+  }
 
   .toast{
     position:absolute; left:50%; bottom:30px; transform:translateX(-50%);

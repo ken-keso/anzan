@@ -45,7 +45,7 @@
       <button class="diff-btn" data-diff="normal" onclick="App.selectDifficulty('normal')">ふつう</button>
       <button class="diff-btn" data-diff="hard" onclick="App.selectDifficulty('hard')">むずかしい</button>
     </div>
-    <button class="big-btn" id="startBtn" style="margin-top:22px;" disabled onclick="App.startCalc()">けってい</button>
+    <button class="big-btn" id="startBtn" style="margin-top:22px;" disabled onclick="App.startCalc()">スタート</button>
     <button class="big-btn ghost" style="margin-top:10px;" onclick="App.goHistory()">📊 けっかをみる</button>
   </section>
 
@@ -55,6 +55,11 @@
       <button class="icon-btn" onclick="App.goModeSelect()">←</button>
       <h2 id="historyUserLabel" style="font-size:18px;"></h2>
       <div style="width:44px;"></div>
+    </div>
+    <div class="stamp-panel" id="stampPanel">
+      <div class="stamp-panel-title">🏅 あつめたスタンプ</div>
+      <div class="stamp-panel-count"><span id="stampPanelCount">0</span>こ</div>
+      <div class="stamp-panel-grid" id="stampPanelGrid"></div>
     </div>
     <div class="history-content" id="historyContent"></div>
   </section>
@@ -86,7 +91,7 @@
       <button class="key" data-k="0">0</button>
       <button class="key func" data-k="back">⌫</button>
     </div>
-    <button class="confirm-btn" id="confirmBtn" disabled>かくてい</button>
+    <button class="confirm-btn" id="confirmBtn" disabled>OK</button>
 
     <div class="feedback-overlay" id="feedbackOverlay">
       <svg class="mascot" id="mascotFeedback" viewBox="0 0 120 120"><use href="#mascot-normal"/></svg>
@@ -105,8 +110,13 @@
     </div>
     <div class="result-list" id="resultList"></div>
     <div class="result-actions">
-      <button class="big-btn secondary" onclick="App.goModeSelect()">もういちど</button>
-      <button class="big-btn" onclick="App.goUserSelect()">ユーザ選択へ</button>
+      <button class="big-btn" onclick="App.goTop()">さいしょにもどる</button>
+      <button class="big-btn secondary" onclick="App.goModeSelect()">しゅるいをえらぶ</button>
+    </div>
+
+    <div class="stamp-get-overlay" id="stampGetOverlay">
+      <div class="stamp-get-burst" id="stampGetBurst">🏅</div>
+      <div class="stamp-get-text">まんてん！<br>スタンプゲット！</div>
     </div>
   </section>
 
