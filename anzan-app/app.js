@@ -214,19 +214,52 @@
     }catch(e){ /* 音が出せない環境は無視 */ }
   }
 
-  // スタンプゲット音：高音のベルを連打しながら駆け上がり、
-  // 最後にキラキラのノイズスパークルで締める、ひときわ派手な一撃。
+  // スタンプゲット音：上昇ベルの助走から始まり、厚みのあるメジャー7thコード、
+  // 駆け上がる装飾フレーズ、壮大なフィナーレのコード、余韻のスパークルへと
+  // 展開する約3秒の「ゴージャス版」ファンファーレ。
   function playStampSound(){
     try{
       const ctx = audioCtx();
-      const run = [783.99, 987.77, 1174.66, 1567.98, 2093.00]; // G5 B5 D6 G6 C7
+
+      // ① 上昇ベルの助走（0.00〜0.50秒）
+      const run = [659.25, 783.99, 987.77, 1174.66, 1396.91, 1567.98]; // E5 G5 B5 D6 F6 G6
       run.forEach((f,i)=>{
-        const start = i*0.09;
-        tone(ctx, f,   start, 0.30, {type:"triangle", peakGain:0.26});
-        tone(ctx, f*2, start, 0.20, {type:"sine",     peakGain:0.08});
+        const start = i*0.075;
+        tone(ctx, f,   start, 0.32, {type:"triangle", peakGain:0.24});
+        tone(ctx, f*2, start, 0.22, {type:"sine",     peakGain:0.07});
       });
-      noiseBurst(ctx, run.length*0.09, 0.45, {peakGain:0.16, filterType:"highpass", filterFreq:6500, Q:0.6});
-      noiseBurst(ctx, run.length*0.09+0.08, 0.35, {peakGain:0.12, filterType:"highpass", filterFreq:8000, Q:0.5});
+      noiseBurst(ctx, run.length*0.075, 0.30, {peakGain:0.14, filterType:"highpass", filterFreq:7000, Q:0.6});
+
+      // ② 厚みのある第一コード（メジャー7th＋ベース。0.55〜1.40秒）
+      const chord1Start = 0.55;
+      const chord1Dur = 0.85;
+      tone(ctx, 196.00, chord1Start, chord1Dur, {type:"sine", peakGain:0.15}); // ベースG3
+      const chord1 = [783.99, 987.77, 1174.66, 1479.98]; // G5 B5 D6 F#6
+      chord1.forEach(f=>{
+        tone(ctx, f,   chord1Start, chord1Dur,       {type:"triangle", peakGain:0.18});
+        tone(ctx, f*2, chord1Start, chord1Dur*0.7,   {type:"sine",     peakGain:0.05});
+      });
+      noiseBurst(ctx, chord1Start, chord1Dur*0.5, {peakGain:0.1, filterType:"highpass", filterFreq:6000, Q:0.5});
+
+      // ③ 駆け上がる装飾フレーズ（1.40〜1.70秒）
+      const flourish = [1567.98, 1760.00, 2093.00]; // G6 A6 C7
+      flourish.forEach((f,i)=> tone(ctx, f, 1.40 + i*0.09, 0.18, {type:"triangle", peakGain:0.2}));
+
+      // ④ 壮大なフィナーレのコード（ベース2声＋5音の厚いボイシング。1.75〜2.65秒）
+      const finalStart = 1.75;
+      const finalDur = 0.9;
+      tone(ctx, 130.81, finalStart, finalDur, {type:"sine", peakGain:0.16}); // ベースC3
+      tone(ctx, 196.00, finalStart, finalDur, {type:"sine", peakGain:0.1});  // 5度を厚く（G3）
+      const finalChord = [523.25, 659.25, 783.99, 1046.50, 1318.51]; // C5 E5 G5 C6 E6
+      finalChord.forEach(f=>{
+        tone(ctx, f,   finalStart, finalDur,       {type:"triangle", peakGain:0.2});
+        tone(ctx, f*2, finalStart, finalDur*0.8,   {type:"sine",     peakGain:0.06});
+      });
+      noiseBurst(ctx, finalStart, finalDur*0.9, {peakGain:0.12, filterType:"highpass", filterFreq:5500, Q:0.5});
+
+      // ⑤ 余韻のスパークル（2.55〜3.10秒ごろまで）
+      const sparkle = [1567.98, 2093.00, 2637.02]; // G6 C7 E7
+      sparkle.forEach((f,i)=> tone(ctx, f, 2.55 + i*0.12, 0.35, {type:"sine", peakGain:0.09}));
     }catch(e){ /* 音が出せない環境は無視 */ }
   }
 
@@ -718,7 +751,7 @@
 
     setTimeout(()=>{
       overlay.classList.remove("show");
-    }, 2400);
+    }, 4400);
   }
 
   /* ---------- 結果画面 ---------- */
