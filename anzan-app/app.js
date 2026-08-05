@@ -813,7 +813,7 @@
   /* ---------- Service Worker（PWA。file://では登録スキップ） ---------- */
   function registerServiceWorker(){
     if("serviceWorker" in navigator && location.protocol.startsWith("http")){
-      navigator.serviceWorker.register("sw.js").catch(()=>{});
+      navigator.serviceWorker.register("sw.js", { updateViaCache: "none" });
     }
   }
 
