@@ -5,6 +5,9 @@
 (function(){
   "use strict";
 
+  /* ---------- アプリバージョン（トップ画面右上に表示） ---------- */
+  const APP_VERSION = "1.0.0";
+
   /* ---------- 既定データ（users.js が読み込めなかった場合のフォールバック） ---------- */
   const DEFAULT_USERS = [
     {id:1, name:"ちよね"},
@@ -463,6 +466,12 @@
     return n;
   }
 
+  /* ---------- バージョン表示（トップ画面右上） ---------- */
+  function renderVersionBadge(){
+    const el = document.getElementById("versionBadge");
+    if(el) el.textContent = "v" + APP_VERSION;
+  }
+
   /* ---------- マスコット表情 ---------- */
   function setMascot(elId, symbol){
     document.getElementById(elId).querySelector("use").setAttribute("href", "#"+symbol);
@@ -479,6 +488,7 @@
       buildModeGrid();
       bindKeypad();
       registerServiceWorker();
+      renderVersionBadge();
     },
 
     /* ---- 画面遷移 ---- */

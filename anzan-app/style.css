@@ -88,6 +88,15 @@
     text-shadow:2px 2px 0 #fff, -2px -2px 0 #fff, 2px -2px 0 #fff, -2px 2px 0 #fff;
   }
   #screen-top .sub{ font-size:16px; color:var(--ink-soft); font-weight:700; }
+  .version-badge{
+    position:absolute;
+    top:calc(14px + env(safe-area-inset-top));
+    right:16px;
+    font-size:12px; font-weight:700; color:var(--ink-soft);
+    background:#fff; padding:4px 10px; border-radius:999px;
+    box-shadow:var(--shadow-sm);
+    opacity:0.85;
+  }
   .bounce{ animation:bounce 1.6s ease-in-out infinite; }
   @keyframes bounce{ 0%,100%{transform:translateY(0);} 50%{transform:translateY(-10px);} }
 
