@@ -7,16 +7,26 @@
 
   /* ---------- 既定データ（users.js が読み込めなかった場合のフォールバック） ---------- */
   const DEFAULT_USERS = [
-    {id:1, name:"ゆうた"},
-    {id:2, name:"さくら"},
-    {id:3, name:"けんた"}
+    {id:1, name:"ちよね"},
+    {id:2, name:"ばんじ"},
+    {id:3, name:"あやめ"}
   ];
   const LS_RESULTS_PREFIX = "anzan_results_"; // + userId
   const LS_STAMPS_PREFIX = "anzan_stamps_"; // + userId（モード・なんいどに関わらず共通で蓄積）
 
-  const MODE_LABELS = {add:"たしざん", sub:"ひきざん", mul:"かけざん", div:"わりざん"};
-  const MODE_ICONS  = {add:"➕", sub:"➖", mul:"✖️", div:"➗"};
-  const DIFF_LABELS = {easy:"かんたん", normal:"ふつう", hard:"むずかしい"};
+  const MODE_LABELS = {add:"たしざん", sub:"ひきざん", mul:"かけざん", div:"わりざん", bara:"バラ九九"};
+  const MODE_ICONS  = {add:"➕", sub:"➖", mul:"✖️", div:"➗", bara:"🔀"};
+  const DIFF_LABELS = {easy:"かんたん", normal:"ふつう", hard:"むずかしい", only:"ぜんもん"};
+  // モードごとに選べる「なんいど」の一覧。1つしかないモード（バラ九九など）は
+  // なんいど選択UIを出さず、自動的にそのなんいどで開始する。
+  const MODE_DIFFS = {
+    add:["easy","normal","hard"],
+    sub:["easy","normal","hard"],
+    mul:["easy","normal","hard"],
+    div:["easy","normal","hard"],
+    bara:["only"]
+  };
+  const BARA_TOTAL = 81; // 1〜9 × 1〜9 の全パターン数
 
   /* ---------- 設定（config.js 相当。問題数などをモードごとに外部管理） ----------
      config.js が index.html より先に <script> で読み込まれ、
@@ -30,6 +40,7 @@
   };
 
   function questionsFor(mode){
+    if(mode === "bara") return BARA_TOTAL; // バラ九九は全パターン固定（設定ファイルの影響を受けない）
     const n = CONFIG.questionsPerMode[mode];
     return (typeof n === "number" && n > 0) ? n : DEFAULT_CONFIG.questionsPerMode[mode];
   }
@@ -360,7 +371,24 @@
   }
   const GENERATORS = {add:genAdd, sub:genSub, mul:genMul, div:genDiv};
 
+  // バラ九九：1〜9 × 1〜9 の全81パターンを必ず1回ずつ、
+  // 出題順だけシャッフル（Fisher-Yates）してランダムにする。
+  function generateBaraSet(){
+    const list = [];
+    for(let a=1;a<=9;a++){
+      for(let b=1;b<=9;b++){
+        list.push({a,b,op:"×",answer:a*b});
+      }
+    }
+    for(let i=list.length-1;i>0;i--){
+      const j = Math.floor(Math.random()*(i+1));
+      const tmp = list[i]; list[i] = list[j]; list[j] = tmp;
+    }
+    return list;
+  }
+
   function generateProblems(mode, diff){
+    if(mode === "bara") return generateBaraSet();
     const list = [];
     const count = questionsFor(mode);
     for(let i=0;i<count;i++){
@@ -376,7 +404,7 @@
     const store = {};
     Object.keys(MODE_LABELS).forEach(mode=>{
       store[mode] = {};
-      Object.keys(DIFF_LABELS).forEach(diff=>{ store[mode][diff] = []; });
+      MODE_DIFFS[mode].forEach(diff=>{ store[mode][diff] = []; });
     });
     return store;
   }
@@ -391,7 +419,7 @@
       // 形式が異なるため引き継がず、新しい構造で使い始める。
       if(Array.isArray(parsed)) return store;
       Object.keys(MODE_LABELS).forEach(mode=>{
-        Object.keys(DIFF_LABELS).forEach(diff=>{
+        MODE_DIFFS[mode].forEach(diff=>{
           if(parsed[mode] && Array.isArray(parsed[mode][diff])){
             store[mode][diff] = parsed[mode][diff];
           }
@@ -411,10 +439,12 @@
     localStorage.setItem(LS_RESULTS_PREFIX+userId, JSON.stringify(store));
   }
 
-  // 指定したモード（かんたん・ふつう・むずかしい すべて）の記録を消す
+  // 指定したモード（そのモードが持つなんいど すべて）の記録を消す
   function resetModeResults(userId, mode){
     const store = loadUserResultsStore(userId);
-    store[mode] = { easy:[], normal:[], hard:[] };
+    const cleared = {};
+    MODE_DIFFS[mode].forEach(diff=>{ cleared[diff] = []; });
+    store[mode] = cleared;
     localStorage.setItem(LS_RESULTS_PREFIX+userId, JSON.stringify(store));
   }
 
@@ -466,6 +496,9 @@
       document.querySelectorAll(".mode-card").forEach(c=>c.classList.remove("selected"));
       document.querySelectorAll(".diff-btn").forEach(c=>c.classList.remove("selected"));
       document.getElementById("startBtn").disabled = true;
+      // なんいど選択UIをいったん通常表示に戻す（バラ九九選択直後の非表示状態を引きずらないように）
+      document.getElementById("diffRow").style.display = "";
+      document.getElementById("diffPanelTitle").style.display = "";
       showScreen("screen-mode");
     },
     selectUser(u){
@@ -490,6 +523,7 @@
 
     selectDifficulty(diff){
       if(!state.mode) return;
+      if(MODE_DIFFS[state.mode].length <= 1) return; // なんいどが1つしかないモードは選択不要
       state.difficulty = diff;
       document.querySelectorAll(".diff-btn").forEach(b=>{
         b.classList.toggle("selected", b.dataset.diff===diff);
@@ -545,6 +579,15 @@
     },
     exportUsers(){
       downloadJson(state.users, "users_backup.json");
+    },
+
+    /* ---- スタンプのリセット（過去の結果画面） ---- */
+    resetStamps(){
+      const ok = confirm(state.currentUser.name+"さんの スタンプを\nぜんぶ けしますか？（もとに戻せません）");
+      if(!ok) return;
+      saveStampCount(state.currentUser.id, 0);
+      renderStampPanel();
+      toast("スタンプを けしました");
     }
   };
 
@@ -573,9 +616,30 @@
       card.onclick = ()=>{
         state.mode = mode;
         document.querySelectorAll(".mode-card").forEach(c=>c.classList.toggle("selected", c===card));
+        applyDifficultyUiForMode(mode);
       };
       grid.appendChild(card);
     });
+  }
+
+  // なんいどが1つしかないモード（バラ九九など）は選択UIを隠して自動選択、
+  // それ以外は通常どおり選ばせる。
+  function applyDifficultyUiForMode(mode){
+    const diffs = MODE_DIFFS[mode];
+    const diffRow = document.getElementById("diffRow");
+    const diffPanelTitle = document.getElementById("diffPanelTitle");
+    document.querySelectorAll(".diff-btn").forEach(c=>c.classList.remove("selected"));
+    if(diffs.length <= 1){
+      diffRow.style.display = "none";
+      diffPanelTitle.style.display = "none";
+      state.difficulty = diffs[0];
+      document.getElementById("startBtn").disabled = false;
+    } else {
+      diffRow.style.display = "";
+      diffPanelTitle.style.display = "";
+      state.difficulty = null;
+      document.getElementById("startBtn").disabled = true;
+    }
   }
 
   /* ---------- スタンプパネル（過去の結果 画面） ---------- */
@@ -618,7 +682,7 @@
           '<button class="history-reset-btn" onclick="App.resetModeHistory(\''+mode+'\')">🗑 リセット</button>' +
         '</div>';
 
-      Object.keys(DIFF_LABELS).forEach(diff=>{
+      MODE_DIFFS[mode].forEach(diff=>{
         const sessions = (store[mode] && store[mode][diff]) || [];
         const block = document.createElement("div");
         block.className = "history-diff-block";
@@ -727,8 +791,12 @@
   }
 
   /* ---------- スタンプゲット演出 ---------- */
-  function showStampGetEffect(){
+  function showStampGetEffect(isPerfect){
     const overlay = document.getElementById("stampGetOverlay");
+    const textEl = document.getElementById("stampGetText");
+    textEl.innerHTML = isPerfect
+      ? "まんてん！<br>スタンプゲット！"
+      : "はんぶんいじょう せいかい！<br>スタンプゲット！";
 
     // 既存のスパーク要素を掃除してから、飛び散る星をランダムに生成
     overlay.querySelectorAll(".stamp-spark").forEach(el=>el.remove());
@@ -775,9 +843,10 @@
     };
     saveUserSession(state.currentUser.id, session);
 
-    // まんてん（全問正解）ならスタンプを1つ加算
+    // 問題数の半分以上正解でスタンプを1つ加算（満点ならさらに演出メッセージが変わる）
     const isPerfect = correctCount === state.totalQuestions;
-    if(isPerfect){
+    const earnsStamp = correctCount >= Math.ceil(state.totalQuestions/2);
+    if(earnsStamp){
       addStamp(state.currentUser.id);
     }
 
@@ -804,9 +873,9 @@
     showScreen("screen-result");
     playResultFanfare();
 
-    if(isPerfect){
+    if(earnsStamp){
       // ファンファーレと少し重ねつつ、スタンプ演出をひときわ派手に表示
-      setTimeout(showStampGetEffect, 600);
+      setTimeout(()=>showStampGetEffect(isPerfect), 600);
     }
   }
 

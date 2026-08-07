@@ -39,7 +39,7 @@
     </div>
     <div class="panel-title">けいさんのしゅるい</div>
     <div class="mode-grid" id="modeGrid"></div>
-    <div class="panel-title">なんいど</div>
+    <div class="panel-title" id="diffPanelTitle">なんいど</div>
     <div class="diff-row" id="diffRow">
       <button class="diff-btn" data-diff="easy" onclick="App.selectDifficulty('easy')">かんたん</button>
       <button class="diff-btn" data-diff="normal" onclick="App.selectDifficulty('normal')">ふつう</button>
@@ -57,7 +57,10 @@
       <div style="width:44px;"></div>
     </div>
     <div class="stamp-panel" id="stampPanel">
-      <div class="stamp-panel-title">🏅 あつめたスタンプ</div>
+      <div class="stamp-panel-header">
+        <div class="stamp-panel-title">🏅 あつめたスタンプ</div>
+        <button class="history-reset-btn" onclick="App.resetStamps()">🗑 リセット</button>
+      </div>
       <div class="stamp-panel-count"><span id="stampPanelCount">0</span>こ</div>
       <div class="stamp-panel-grid" id="stampPanelGrid"></div>
     </div>
@@ -116,7 +119,7 @@
 
     <div class="stamp-get-overlay" id="stampGetOverlay">
       <div class="stamp-get-burst" id="stampGetBurst">🏅</div>
-      <div class="stamp-get-text">まんてん！<br>スタンプゲット！</div>
+      <div class="stamp-get-text" id="stampGetText">まんてん！<br>スタンプゲット！</div>
     </div>
   </section>
 

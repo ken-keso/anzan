@@ -140,6 +140,7 @@
     padding:14px 16px; margin-bottom:14px; flex-shrink:0;
     border:3px solid var(--yellow);
   }
+  .stamp-panel-header{ display:flex; align-items:center; justify-content:space-between; gap:8px; }
   .stamp-panel-title{ font-size:14px; font-weight:800; color:var(--ink-soft); }
   .stamp-panel-count{ font-size:28px; font-weight:800; color:var(--primary-dark); margin:2px 0 8px; }
   .stamp-panel-count span{ font-size:28px; }
