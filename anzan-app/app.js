@@ -6,7 +6,7 @@
   "use strict";
 
   /* ---------- アプリバージョン（トップ画面右上に表示） ---------- */
-  const APP_VERSION = "1.0.0";
+  const APP_VERSION = "1.1.1";
 
   /* ---------- 既定データ（users.js が読み込めなかった場合のフォールバック） ---------- */
   const DEFAULT_USERS = [
