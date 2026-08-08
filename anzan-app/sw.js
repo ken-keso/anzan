@@ -1,7 +1,7 @@
 /* あんざんチャレンジ - Service Worker
    ホスティングして https(or localhost) で開いたときのみ有効になります。
    file:// で直接開いた場合は index.html 側で登録をスキップします。 */
-const CACHE_NAME = "anzan-v1.0.0";
+const CACHE_NAME = "anzan-v1.1.0";
 const ASSETS = [
   "./index.html",
   "./style.css",

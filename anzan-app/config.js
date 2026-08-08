@@ -8,9 +8,9 @@
 window.APP_CONFIG = {
   // モードごとの1回あたりの出題数（3〜99の範囲を想定）
   questionsPerMode: {
-    add: 20,
-    sub: 20,
-    mul: 20,
-    div: 20
+    add: 2,
+    sub: 2,
+    mul: 2,
+    div: 2
   }
 };

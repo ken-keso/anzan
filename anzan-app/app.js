@@ -451,19 +451,49 @@
     localStorage.setItem(LS_RESULTS_PREFIX+userId, JSON.stringify(store));
   }
 
-  /* ---------- スタンプ（まんてん獲得で蓄積。モード・なんいど共通） ---------- */
-  function loadStampCount(userId){
+  /* ---------- スタンプ（問題数の半分以上正解で蓄積。モード・なんいど共通） ----------
+     各スタンプは "normal"（半分以上正解）か "perfect"（満点）のどちらかの
+     種類を持ち、満点スタンプは見た目をワンランク良くして区別する。 */
+  function loadStamps(userId){
     const raw = localStorage.getItem(LS_STAMPS_PREFIX+userId);
-    const n = raw != null ? parseInt(raw, 10) : 0;
-    return (isNaN(n) || n < 0) ? 0 : n;
+    if(!raw) return [];
+    try{
+      const parsed = JSON.parse(raw);
+      if(Array.isArray(parsed)){
+        return parsed.filter(t=> t==="perfect" || t==="normal");
+      }
+    }catch(e){ /* JSONでなければ旧形式（数値のみ）の可能性があるので下で処理 */ }
+    // 旧バージョン（スタンプ数の数値のみ保存）からの移行：すべて通常スタンプとして扱う
+    const n = parseInt(raw, 10);
+    return (!isNaN(n) && n > 0) ? new Array(n).fill("normal") : [];
   }
-  function saveStampCount(userId, count){
-    localStorage.setItem(LS_STAMPS_PREFIX+userId, String(count));
+  function saveStamps(userId, stamps){
+    localStorage.setItem(LS_STAMPS_PREFIX+userId, JSON.stringify(stamps));
   }
-  function addStamp(userId){
-    const n = loadStampCount(userId) + 1;
-    saveStampCount(userId, n);
-    return n;
+  function loadStampCount(userId){
+    return loadStamps(userId).length;
+  }
+  function addStamp(userId, isPerfect){
+    const stamps = loadStamps(userId);
+    stamps.push(isPerfect ? "perfect" : "normal");
+    saveStamps(userId, stamps);
+    return stamps.length;
+  }
+
+  /* ---------- テンキーの並び順設定（でんたく風／でんわ風。全ユーザー共通） ---------- */
+  const LS_KEYPAD_LAYOUT_KEY = "anzan_keypad_layout";
+  // calc  = でんたく風：上から 7 8 9 / 4 5 6 / 1 2 3（今までどおり、上に行くほど数字が大きい）
+  // phone = でんわ風  ：上から 1 2 3 / 4 5 6 / 7 8 9（下に行くほど数字が大きい）
+  const KEYPAD_LAYOUTS = {
+    calc:  ["7","8","9","4","5","6","1","2","3","clear","0","back"],
+    phone: ["1","2","3","4","5","6","7","8","9","clear","0","back"]
+  };
+  function getKeypadLayout(){
+    return localStorage.getItem(LS_KEYPAD_LAYOUT_KEY) === "phone" ? "phone" : "calc";
+  }
+  function setKeypadLayout(layout){
+    localStorage.setItem(LS_KEYPAD_LAYOUT_KEY, layout === "phone" ? "phone" : "calc");
+    renderKeypad();
   }
 
   /* ---------- バージョン表示（トップ画面右上） ---------- */
@@ -486,6 +516,7 @@
       loadUsers();
       renderUserList();
       buildModeGrid();
+      renderKeypad();
       bindKeypad();
       registerServiceWorker();
       renderVersionBadge();
@@ -570,6 +601,13 @@
       showFeedback(correct, p.answer);
     },
 
+    /* ---- とちゅう終了（けいさん画面の✕ボタン） ---- */
+    quitCalc(){
+      const ok = confirm("けいさんを とちゅうで やめますか？\nここまでの きろくは 保存されます。");
+      if(!ok) return;
+      abortSession();
+    },
+
     /* ---- ユーザ設定モーダル（表示専用。名前の変更は users.js を編集） ---- */
     openUserEdit(){
       const rows = document.getElementById("userEditRows");
@@ -595,9 +633,23 @@
     resetStamps(){
       const ok = confirm(state.currentUser.name+"さんの スタンプを\nぜんぶ けしますか？（もとに戻せません）");
       if(!ok) return;
-      saveStampCount(state.currentUser.id, 0);
+      saveStamps(state.currentUser.id, []);
       renderStampPanel();
       toast("スタンプを けしました");
+    },
+
+    /* ---- テンキーの並び順せってい（モード選択画面の⚙から開く） ---- */
+    openKeypadSettings(){
+      updateKeypadLayoutButtons();
+      document.getElementById("keypadModal").classList.add("show");
+    },
+    closeKeypadSettings(){
+      document.getElementById("keypadModal").classList.remove("show");
+    },
+    selectKeypadLayout(layout){
+      setKeypadLayout(layout);
+      updateKeypadLayoutButtons();
+      toast(layout === "phone" ? "でんわ風の ならびに かえました" : "でんたく風の ならびに かえました");
     }
   };
 
@@ -609,6 +661,13 @@
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
     URL.revokeObjectURL(url);
     toast("JSONを保存しました");
+  }
+
+  function updateKeypadLayoutButtons(){
+    const layout = getKeypadLayout();
+    document.querySelectorAll("#keypadLayoutRow .diff-btn").forEach(b=>{
+      b.classList.toggle("selected", b.dataset.layout === layout);
+    });
   }
 
   /* ---------- モード選択グリッド構築 ---------- */
@@ -654,20 +713,20 @@
 
   /* ---------- スタンプパネル（過去の結果 画面） ---------- */
   function renderStampPanel(){
-    const count = loadStampCount(state.currentUser.id);
-    document.getElementById("stampPanelCount").textContent = count;
+    const stamps = loadStamps(state.currentUser.id);
+    document.getElementById("stampPanelCount").textContent = stamps.length;
     const grid = document.getElementById("stampPanelGrid");
     grid.innerHTML = "";
-    if(count === 0){
-      grid.innerHTML = '<span class="stamp-empty">まんてんをとって スタンプをあつめよう！</span>';
+    if(stamps.length === 0){
+      grid.innerHTML = '<span class="stamp-empty">はんぶんいじょう せいかいして スタンプをあつめよう！</span>';
       return;
     }
-    for(let i=0;i<count;i++){
+    stamps.forEach(type=>{
       const s = document.createElement("span");
-      s.className = "stamp-icon";
-      s.textContent = "🏅";
+      s.className = "stamp-icon" + (type === "perfect" ? " perfect" : "");
+      s.textContent = type === "perfect" ? "🏆" : "🏅";
       grid.appendChild(s);
-    }
+    });
   }
 
   /* ---------- 過去の結果 画面 ---------- */
@@ -703,11 +762,16 @@
         } else {
           // 新しいものが上にくるように並べ替えて表示
           rowsHtml = sessions.slice().reverse().map(s=>{
-            const rate = Math.round((s.correctCount / s.totalCount) * 100);
+            const attempted = (typeof s.answeredCount === "number") ? s.answeredCount : s.totalCount;
+            const rate = attempted > 0 ? Math.round((s.correctCount / attempted) * 100) : 0;
+            const scoreText = s.aborted
+              ? (s.correctCount + '/' + attempted + '（' + s.totalCount + 'もん中）')
+              : (s.correctCount + '/' + s.totalCount);
+            const abortedBadge = s.aborted ? '<span class="hr-aborted">とちゅう</span>' : '';
             return (
-              '<div class="history-row">' +
+              '<div class="history-row' + (s.aborted ? ' aborted' : '') + '">' +
                 '<span class="hr-date">' + fmtDateTime(s.date) + '</span>' +
-                '<span class="hr-score">' + s.correctCount + '/' + s.totalCount + '（' + rate + '%）</span>' +
+                '<span class="hr-score">' + scoreText + '（' + rate + '%）' + abortedBadge + '</span>' +
                 '<span class="hr-time">' + fmtTime(s.totalTimeSec) + '</span>' +
               '</div>'
             );
@@ -748,6 +812,19 @@
       box.classList.remove("placeholder");
     }
     document.getElementById("confirmBtn").disabled = currentInput === "";
+  }
+
+  function renderKeypad(){
+    const keypad = document.getElementById("keypad");
+    const keys = KEYPAD_LAYOUTS[getKeypadLayout()];
+    keypad.innerHTML = "";
+    keys.forEach(k=>{
+      const btn = document.createElement("button");
+      btn.className = "key" + (k === "clear" || k === "back" ? " func" : "");
+      btn.dataset.k = k;
+      btn.textContent = k === "clear" ? "C" : (k === "back" ? "⌫" : k);
+      keypad.appendChild(btn);
+    });
   }
 
   function bindKeypad(){
@@ -803,15 +880,20 @@
   /* ---------- スタンプゲット演出 ---------- */
   function showStampGetEffect(isPerfect){
     const overlay = document.getElementById("stampGetOverlay");
+    const burstEl = document.getElementById("stampGetBurst");
     const textEl = document.getElementById("stampGetText");
+
+    burstEl.textContent = isPerfect ? "🏆" : "🏅";
+    burstEl.classList.toggle("perfect", isPerfect);
     textEl.innerHTML = isPerfect
-      ? "まんてん！<br>スタンプゲット！"
+      ? "まんてん！<br>とくべつな スタンプゲット！"
       : "はんぶんいじょう せいかい！<br>スタンプゲット！";
 
     // 既存のスパーク要素を掃除してから、飛び散る星をランダムに生成
+    // （満点のときは、種類も数も増やしてさらに華やかに）
     overlay.querySelectorAll(".stamp-spark").forEach(el=>el.remove());
-    const sparkChars = ["✨","⭐","🎉"];
-    const sparkCount = 14;
+    const sparkChars = isPerfect ? ["✨","⭐","🎉","💫","🌟"] : ["✨","⭐","🎉"];
+    const sparkCount = isPerfect ? 20 : 14;
     for(let i=0;i<sparkCount;i++){
       const s = document.createElement("span");
       s.className = "stamp-spark";
@@ -830,6 +912,36 @@
     setTimeout(()=>{
       overlay.classList.remove("show");
     }, 4400);
+  }
+
+  /* ---------- とちゅう終了（けいさん画面の✕ボタン） ---------- */
+  function abortSession(){
+    stopTimer();
+    document.getElementById("feedbackOverlay").classList.remove("show");
+    const totalSec = (Date.now()-state.startTime)/1000;
+    const correctCount = state.results.filter(r=>r.correct).length;
+    const answeredCount = state.results.length;
+
+    const session = {
+      userId: state.currentUser.id,
+      userName: state.currentUser.name,
+      mode: state.mode,
+      modeLabel: MODE_LABELS[state.mode],
+      difficulty: state.difficulty,
+      difficultyLabel: DIFF_LABELS[state.difficulty],
+      date: new Date().toISOString(),
+      totalTimeSec: Math.round(totalSec*10)/10,
+      correctCount: correctCount,
+      totalCount: state.totalQuestions,
+      answeredCount: answeredCount,
+      aborted: true,
+      details: state.results
+    };
+    saveUserSession(state.currentUser.id, session);
+    // とちゅう終了ではスタンプは付与しない
+
+    toast("とちゅうで おわりました（きろくは保存しました）");
+    App.goModeSelect();
   }
 
   /* ---------- 結果画面 ---------- */
@@ -853,11 +965,11 @@
     };
     saveUserSession(state.currentUser.id, session);
 
-    // 問題数の半分以上正解でスタンプを1つ加算（満点ならさらに演出メッセージが変わる）
+    // 問題数の半分以上正解でスタンプを1つ加算（満点ならワンランク良いスタンプになる）
     const isPerfect = correctCount === state.totalQuestions;
     const earnsStamp = correctCount >= Math.ceil(state.totalQuestions/2);
     if(earnsStamp){
-      addStamp(state.currentUser.id);
+      addStamp(state.currentUser.id, isPerfect);
     }
 
     document.getElementById("resultTitle").textContent =

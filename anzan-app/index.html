@@ -36,7 +36,7 @@
     <div class="top-bar">
       <button class="icon-btn" onclick="App.goUserSelect()">←</button>
       <h2 id="modeUserLabel" style="font-size:18px;"></h2>
-      <div style="width:44px;"></div>
+      <button class="icon-btn" onclick="App.openKeypadSettings()">⚙</button>
     </div>
     <div class="panel-title">けいさんのしゅるい</div>
     <div class="mode-grid" id="modeGrid"></div>
@@ -71,6 +71,7 @@
   <!-- ==================== 計算画面 ==================== -->
   <section id="screen-calc" class="screen">
     <div class="calc-top">
+      <button class="icon-btn small" id="quitBtn" onclick="App.quitCalc()">✕</button>
       <div class="progress-pill" id="progressLabel">1 / 20</div>
       <div class="timer-pill" id="timerLabel">0:00</div>
     </div>
@@ -81,20 +82,7 @@
       <div class="answer-box placeholder" id="answerBox">こたえ</div>
     </div>
 
-    <div class="keypad" id="keypad">
-      <button class="key" data-k="7">7</button>
-      <button class="key" data-k="8">8</button>
-      <button class="key" data-k="9">9</button>
-      <button class="key" data-k="4">4</button>
-      <button class="key" data-k="5">5</button>
-      <button class="key" data-k="6">6</button>
-      <button class="key" data-k="1">1</button>
-      <button class="key" data-k="2">2</button>
-      <button class="key" data-k="3">3</button>
-      <button class="key func" data-k="clear">C</button>
-      <button class="key" data-k="0">0</button>
-      <button class="key func" data-k="back">⌫</button>
-    </div>
+    <div class="keypad" id="keypad"></div>
     <button class="confirm-btn" id="confirmBtn" disabled>OK</button>
 
     <div class="feedback-overlay" id="feedbackOverlay">
@@ -135,6 +123,21 @@
       </div>
       <div class="modal-actions">
         <button class="big-btn" style="width:100%;" onclick="App.closeUserEdit()">とじる</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== テンキー並び順 せっていモーダル ==================== -->
+  <div class="modal-backdrop" id="keypadModal">
+    <div class="modal-sheet">
+      <h3>すうじボタンの ならび</h3>
+      <p class="modal-hint">けいさん画面の テンキーの すうじの ならびかたを えらべます。</p>
+      <div class="diff-row" id="keypadLayoutRow">
+        <button class="diff-btn" data-layout="calc" onclick="App.selectKeypadLayout('calc')">でんたく風<br><small>7 8 9が上</small></button>
+        <button class="diff-btn" data-layout="phone" onclick="App.selectKeypadLayout('phone')">でんわ風<br><small>1 2 3が上</small></button>
+      </div>
+      <div class="modal-actions">
+        <button class="big-btn" style="width:100%;" onclick="App.closeKeypadSettings()">とじる</button>
       </div>
     </div>
   </div>
