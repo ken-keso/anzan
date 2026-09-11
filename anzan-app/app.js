@@ -6,7 +6,7 @@
   "use strict";
 
   /* ---------- アプリバージョン（トップ画面右上に表示） ---------- */
-  const APP_VERSION = "1.1.1";
+  const APP_VERSION = "1.2.0";
 
   /* ---------- 既定データ（users.js が読み込めなかった場合のフォールバック） ---------- */
   const DEFAULT_USERS = [
@@ -16,6 +16,7 @@
   ];
   const LS_RESULTS_PREFIX = "anzan_results_"; // + userId
   const LS_STAMPS_PREFIX = "anzan_stamps_"; // + userId（モード・なんいどに関わらず共通で蓄積）
+  const LS_HIGHSCORE_PREFIX = "anzan_highscores_"; // + userId（モード×なんいどごとに、いちばん速いタイムだけ保存）
 
   const MODE_LABELS = {add:"たしざん", sub:"ひきざん", mul:"かけざん", div:"わりざん", bara:"バラ九九"};
   const MODE_ICONS  = {add:"➕", sub:"➖", mul:"✖️", div:"➗", bara:"🔀"};
@@ -277,6 +278,37 @@
     }catch(e){ /* 音が出せない環境は無視 */ }
   }
 
+  // ハイスコア更新ボーナス専用の「でんげき」ジングル：矩形波の駆け上がる
+  // 短い連符のあと、きらめくメジャーコードを長く伸ばして締める、
+  // レトロなアクションゲームの「大事なアイテムを取った時」のような
+  // 高揚感を狙ったオリジナル構成（特定の楽曲の再現ではない）。
+  function playRecordFanfare(){
+    try{
+      const ctx = audioCtx();
+
+      // ① 駆け上がる短い連符（0.00〜0.45秒）
+      const run = [1046.50, 1318.51, 1567.98, 2093.00, 2637.02]; // C6 E6 G6 C7 E7
+      run.forEach((f,i)=>{
+        const start = i*0.09;
+        tone(ctx, f,   start, 0.12, {type:"square", peakGain:0.22});
+        tone(ctx, f*2, start, 0.08, {type:"sine",   peakGain:0.05});
+      });
+
+      // ② 長く伸ばして輝かせる締めのコード（0.48〜1.25秒）
+      const holdStart = run.length*0.09 + 0.03;
+      const holdDur = 0.78;
+      tone(ctx, 1046.50, holdStart, holdDur, {type:"sine",   peakGain:0.15}); // ベースC6
+      tone(ctx, 2093.00, holdStart, holdDur, {type:"square", peakGain:0.20}); // C7
+      tone(ctx, 2637.02, holdStart, holdDur, {type:"square", peakGain:0.15}); // E7
+      tone(ctx, 3135.96, holdStart, holdDur, {type:"square", peakGain:0.11}); // G7
+      noiseBurst(ctx, holdStart, holdDur*0.9, {peakGain:0.16, filterType:"highpass", filterFreq:7000, Q:0.5});
+
+      // ③ 余韻のきらめき（1.25〜1.75秒ごろまで）
+      const sparkle = [2093.00, 2637.02, 3135.96];
+      sparkle.forEach((f,i)=> tone(ctx, f, 1.25 + i*0.12, 0.3, {type:"sine", peakGain:0.08}));
+    }catch(e){ /* 音が出せない環境は無視 */ }
+  }
+
   /* ---------- ユーザ管理（users.js を起動のたびに必ず反映） ---------- */
   function loadUsers(){
     const fileUsers = (window.APP_USERS && Array.isArray(window.APP_USERS)) ? window.APP_USERS : null;
@@ -449,18 +481,65 @@
     MODE_DIFFS[mode].forEach(diff=>{ cleared[diff] = []; });
     store[mode] = cleared;
     localStorage.setItem(LS_RESULTS_PREFIX+userId, JSON.stringify(store));
+    resetModeHighScores(userId, mode); // ハイスコアも合わせて消す
+  }
+
+  /* ---------- ハイスコア（モード×なんいどごとに、いちばん速いタイムだけ保存） ----------
+     結果画面で「けいさんし終えた」ときだけ判定する（とちゅう終了は対象外）。
+     正解数に関わらず、そのタイムがそれまでの記録より速ければ更新する。 */
+  function loadHighScores(userId){
+    const store = {};
+    Object.keys(MODE_LABELS).forEach(mode=>{
+      store[mode] = {};
+      MODE_DIFFS[mode].forEach(diff=>{ store[mode][diff] = null; });
+    });
+    const raw = localStorage.getItem(LS_HIGHSCORE_PREFIX+userId);
+    if(!raw) return store;
+    try{
+      const parsed = JSON.parse(raw);
+      Object.keys(MODE_LABELS).forEach(mode=>{
+        MODE_DIFFS[mode].forEach(diff=>{
+          const e = parsed[mode] && parsed[mode][diff];
+          if(e && typeof e.timeSec === "number") store[mode][diff] = e;
+        });
+      });
+    }catch(e){ /* 壊れていた場合は空のまま */ }
+    return store;
+  }
+  function saveHighScores(userId, store){
+    localStorage.setItem(LS_HIGHSCORE_PREFIX+userId, JSON.stringify(store));
+  }
+  function getHighScore(userId, mode, diff){
+    return loadHighScores(userId)[mode][diff];
+  }
+  // entry: {timeSec, correctCount, totalCount, date}。更新できたら true を返す。
+  function tryUpdateHighScore(userId, mode, diff, entry){
+    const store = loadHighScores(userId);
+    const cur = store[mode][diff];
+    const isNew = !cur || entry.timeSec < cur.timeSec;
+    if(isNew){
+      store[mode][diff] = entry;
+      saveHighScores(userId, store);
+    }
+    return isNew;
+  }
+  function resetModeHighScores(userId, mode){
+    const store = loadHighScores(userId);
+    MODE_DIFFS[mode].forEach(diff=>{ store[mode][diff] = null; });
+    saveHighScores(userId, store);
   }
 
   /* ---------- スタンプ（問題数の半分以上正解で蓄積。モード・なんいど共通） ----------
-     各スタンプは "normal"（半分以上正解）か "perfect"（満点）のどちらかの
-     種類を持ち、満点スタンプは見た目をワンランク良くして区別する。 */
+     各スタンプは "normal"（半分以上正解）/ "perfect"（満点）/ "record"
+     （ハイスコア更新ボーナス）のいずれかの種類を持ち、それぞれ見た目を変えて区別する。 */
+  const STAMP_TYPES = ["normal", "perfect", "record"];
   function loadStamps(userId){
     const raw = localStorage.getItem(LS_STAMPS_PREFIX+userId);
     if(!raw) return [];
     try{
       const parsed = JSON.parse(raw);
       if(Array.isArray(parsed)){
-        return parsed.filter(t=> t==="perfect" || t==="normal");
+        return parsed.filter(t=> STAMP_TYPES.indexOf(t) !== -1);
       }
     }catch(e){ /* JSONでなければ旧形式（数値のみ）の可能性があるので下で処理 */ }
     // 旧バージョン（スタンプ数の数値のみ保存）からの移行：すべて通常スタンプとして扱う
@@ -473,9 +552,10 @@
   function loadStampCount(userId){
     return loadStamps(userId).length;
   }
-  function addStamp(userId, isPerfect){
+  // type: "normal" | "perfect" | "record"
+  function addStamp(userId, type){
     const stamps = loadStamps(userId);
-    stamps.push(isPerfect ? "perfect" : "normal");
+    stamps.push(STAMP_TYPES.indexOf(type) !== -1 ? type : "normal");
     saveStamps(userId, stamps);
     return stamps.length;
   }
@@ -723,8 +803,8 @@
     }
     stamps.forEach(type=>{
       const s = document.createElement("span");
-      s.className = "stamp-icon" + (type === "perfect" ? " perfect" : "");
-      s.textContent = type === "perfect" ? "🏆" : "🏅";
+      s.className = "stamp-icon" + (type !== "normal" ? " " + type : "");
+      s.textContent = type === "perfect" ? "🏆" : (type === "record" ? "⚡" : "🏅");
       grid.appendChild(s);
     });
   }
@@ -878,22 +958,34 @@
   }
 
   /* ---------- スタンプゲット演出 ---------- */
-  function showStampGetEffect(isPerfect){
+  function showStampGetEffect(isPerfect, isNewRecord){
     const overlay = document.getElementById("stampGetOverlay");
     const burstEl = document.getElementById("stampGetBurst");
     const textEl = document.getElementById("stampGetText");
 
-    burstEl.textContent = isPerfect ? "🏆" : "🏅";
-    burstEl.classList.toggle("perfect", isPerfect);
-    textEl.innerHTML = isPerfect
-      ? "まんてん！<br>とくべつな スタンプゲット！"
-      : "はんぶんいじょう せいかい！<br>スタンプゲット！";
+    overlay.classList.toggle("record", !!isNewRecord);
+    burstEl.classList.toggle("record", !!isNewRecord);
+    burstEl.classList.toggle("perfect", !isNewRecord && isPerfect);
+
+    if(isNewRecord){
+      burstEl.textContent = isPerfect ? "🏆⚡" : "⚡";
+      textEl.innerHTML = isPerfect
+        ? "まんてん＆しんきろく！<br>とくべつスタンプ ４こ ゲット！"
+        : "しんきろく たっせい！<br>ボーナススタンプ +3！";
+    } else {
+      burstEl.textContent = isPerfect ? "🏆" : "🏅";
+      textEl.innerHTML = isPerfect
+        ? "まんてん！<br>とくべつな スタンプゲット！"
+        : "はんぶんいじょう せいかい！<br>スタンプゲット！";
+    }
 
     // 既存のスパーク要素を掃除してから、飛び散る星をランダムに生成
-    // （満点のときは、種類も数も増やしてさらに華やかに）
+    // （満点・しんきろくのときほど、種類も数も増やして華やかに）
     overlay.querySelectorAll(".stamp-spark").forEach(el=>el.remove());
-    const sparkChars = isPerfect ? ["✨","⭐","🎉","💫","🌟"] : ["✨","⭐","🎉"];
-    const sparkCount = isPerfect ? 20 : 14;
+    const sparkChars = isNewRecord
+      ? ["⚡","✨","🎆","💥","⭐","🌟"]
+      : (isPerfect ? ["✨","⭐","🎉","💫","🌟"] : ["✨","⭐","🎉"]);
+    const sparkCount = isNewRecord ? 28 : (isPerfect ? 20 : 14);
     for(let i=0;i<sparkCount;i++){
       const s = document.createElement("span");
       s.className = "stamp-spark";
@@ -907,11 +999,15 @@
     }
 
     overlay.classList.add("show");
-    playStampSound();
+    if(isNewRecord){
+      playRecordFanfare();
+    } else {
+      playStampSound();
+    }
 
     setTimeout(()=>{
       overlay.classList.remove("show");
-    }, 4400);
+    }, isNewRecord ? 5200 : 4400);
   }
 
   /* ---------- とちゅう終了（けいさん画面の✕ボタン） ---------- */
@@ -944,11 +1040,32 @@
     App.goModeSelect();
   }
 
+  /* ---------- 結果画面：ハイスコア（ベストタイム）表示 ---------- */
+  function renderHighscoreBanner(isNewRecord, prevRecord, entry){
+    const el = document.getElementById("highscoreBanner");
+    if(isNewRecord){
+      el.className = "highscore-banner newrecord";
+      el.innerHTML =
+        '<div class="hs-left">' +
+          '<div class="hs-title">⚡ ' + (prevRecord ? "しんきろく たっせい！" : "はじめての きろく！") + '</div>' +
+          (prevRecord ? '<div class="hs-prev">まえのベスト: ' + fmtTime(prevRecord.timeSec) + '</div>' : '') +
+        '</div>' +
+        '<div class="hs-time">' + fmtTime(entry.timeSec) + '</div>';
+    } else {
+      el.className = "highscore-banner";
+      el.innerHTML =
+        '<div class="hs-left"><div class="hs-title">🏅 ベストタイム</div></div>' +
+        '<div class="hs-time">' + fmtTime(prevRecord.timeSec) + '</div>';
+    }
+  }
+
   /* ---------- 結果画面 ---------- */
   function finishSession(){
     stopTimer();
     const totalSec = (Date.now()-state.startTime)/1000;
     const correctCount = state.results.filter(r=>r.correct).length;
+    const nowIso = new Date().toISOString();
+    const roundedTime = Math.round(totalSec*10)/10;
 
     const session = {
       userId: state.currentUser.id,
@@ -957,19 +1074,29 @@
       modeLabel: MODE_LABELS[state.mode],
       difficulty: state.difficulty,
       difficultyLabel: DIFF_LABELS[state.difficulty],
-      date: new Date().toISOString(),
-      totalTimeSec: Math.round(totalSec*10)/10,
+      date: nowIso,
+      totalTimeSec: roundedTime,
       correctCount: correctCount,
       totalCount: state.totalQuestions,
       details: state.results
     };
     saveUserSession(state.currentUser.id, session);
 
+    // ハイスコア（そのモード×なんいどで一番速いタイム）の判定・更新
+    // ※とちゅう終了（abortSession）では判定しない＝最後まで解き切ったときだけが対象
+    const prevRecord = getHighScore(state.currentUser.id, state.mode, state.difficulty);
+    const newRecordEntry = { timeSec: roundedTime, correctCount: correctCount, totalCount: state.totalQuestions, date: nowIso };
+    const isNewRecord = tryUpdateHighScore(state.currentUser.id, state.mode, state.difficulty, newRecordEntry);
+
     // 問題数の半分以上正解でスタンプを1つ加算（満点ならワンランク良いスタンプになる）
     const isPerfect = correctCount === state.totalQuestions;
     const earnsStamp = correctCount >= Math.ceil(state.totalQuestions/2);
     if(earnsStamp){
-      addStamp(state.currentUser.id, isPerfect);
+      addStamp(state.currentUser.id, isPerfect ? "perfect" : "normal");
+    }
+    // ハイスコア更新ボーナス：更新できたときだけスタンプ+3（通常の1とあわせて最大4個）
+    if(isNewRecord){
+      for(let i=0;i<3;i++) addStamp(state.currentUser.id, "record");
     }
 
     document.getElementById("resultTitle").textContent =
@@ -977,6 +1104,8 @@
     document.getElementById("resScore").textContent = correctCount+" / "+state.totalQuestions;
     document.getElementById("resTime").textContent = fmtTime(totalSec);
     document.getElementById("resRate").textContent = Math.round((correctCount/state.totalQuestions)*100)+"%";
+
+    renderHighscoreBanner(isNewRecord, prevRecord, newRecordEntry);
 
     const list = document.getElementById("resultList");
     list.innerHTML = "";
@@ -995,9 +1124,12 @@
     showScreen("screen-result");
     playResultFanfare();
 
-    if(earnsStamp){
+    if(isNewRecord){
+      // ハイスコア更新は、いちばん派手な演出＋専用ジングルで祝う
+      setTimeout(()=>showStampGetEffect(isPerfect, true), 600);
+    } else if(earnsStamp){
       // ファンファーレと少し重ねつつ、スタンプ演出をひときわ派手に表示
-      setTimeout(()=>showStampGetEffect(isPerfect), 600);
+      setTimeout(()=>showStampGetEffect(isPerfect, false), 600);
     }
   }
 
