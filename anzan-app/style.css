@@ -143,6 +143,16 @@
 
   .panel-title{ font-size:15px; color:var(--ink-soft); font-weight:800; margin:18px 0 4px; }
 
+  .mode-highscore{
+    display:none;
+    margin-top:14px; padding:8px 14px;
+    background:#F3F0FF; border-radius:999px;
+    font-size:13px; font-weight:800; color:#6B4EFF;
+    text-align:center;
+  }
+  .mode-highscore.show{ display:block; }
+  .mode-highscore strong{ font-size:15px; }
+
   /* ---------- スタンプパネル（過去の結果画面） ---------- */
   .stamp-panel{
     background:linear-gradient(135deg,#FFF6E5,#FFF);
@@ -202,15 +212,20 @@
     display:flex; justify-content:space-between; align-items:baseline;
     font-size:15px; font-weight:800; color:var(--ink-soft);
     padding-bottom:6px; margin-bottom:6px; border-bottom:2px solid #F0F3FA;
+    gap:8px;
   }
-  .history-diff-count{ font-size:12px; font-weight:700; color:#9AA7C2; }
+  .history-diff-label{ flex-shrink:0; }
+  .history-diff-right{ display:flex; align-items:baseline; gap:8px; flex-wrap:wrap; justify-content:flex-end; }
+  .history-diff-best{ font-size:12px; font-weight:800; color:#6B4EFF; white-space:nowrap; }
+  .history-diff-best.none{ color:#C7CEDD; font-weight:700; }
+  .history-diff-count{ font-size:12px; font-weight:700; color:#9AA7C2; white-space:nowrap; }
   .history-empty{ font-size:13px; color:#9AA7C2; padding:6px 0; }
   .history-row{
     display:flex; align-items:center; gap:8px;
     font-size:14px; padding:5px 0;
   }
   .history-row + .history-row{ border-top:1px dashed #EEF1F8; }
-  .history-row .hr-date{ width:80px; color:var(--ink-soft); font-weight:700; flex-shrink:0; }
+  .history-row .hr-date{ width:100px; color:var(--ink-soft); font-weight:700; flex-shrink:0; }
   .history-row .hr-score{ flex:1; font-weight:800; }
   .history-row .hr-time{ color:var(--primary-dark); font-weight:800; }
   .history-row.aborted{ opacity:0.82; }
@@ -404,6 +419,21 @@
   @keyframes stampTextPop{
     from{ transform:translateY(18px); opacity:0; }
     to{ transform:translateY(0); opacity:1; }
+  }
+  .stamp-get-hint{
+    font-size:14px; font-weight:800; color:var(--ink-soft);
+    background:rgba(255,255,255,0.85); padding:6px 16px; border-radius:999px;
+    margin-top:6px;
+    opacity:0;
+    animation: hintFadeIn .4s ease 1.1s both, hintBlink 1.3s ease-in-out 1.6s infinite;
+  }
+  @keyframes hintFadeIn{
+    from{ opacity:0; transform:translateY(6px); }
+    to{ opacity:1; transform:translateY(0); }
+  }
+  @keyframes hintBlink{
+    0%,100%{ opacity:1; }
+    50%{ opacity:0.5; }
   }
   .stamp-spark{
     position:absolute; top:50%; left:50%;

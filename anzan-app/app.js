@@ -6,7 +6,7 @@
   "use strict";
 
   /* ---------- アプリバージョン（トップ画面右上に表示） ---------- */
-  const APP_VERSION = "1.2.0";
+  const APP_VERSION = "1.2.2";
 
   /* ---------- 既定データ（users.js が読み込めなかった場合のフォールバック） ---------- */
   const DEFAULT_USERS = [
@@ -620,6 +620,7 @@
       // なんいど選択UIをいったん通常表示に戻す（バラ九九選択直後の非表示状態を引きずらないように）
       document.getElementById("diffRow").style.display = "";
       document.getElementById("diffPanelTitle").style.display = "";
+      updateModeHighscoreLabel();
       showScreen("screen-mode");
     },
     selectUser(u){
@@ -650,6 +651,7 @@
         b.classList.toggle("selected", b.dataset.diff===diff);
       });
       document.getElementById("startBtn").disabled = false;
+      updateModeHighscoreLabel();
     },
 
     startCalc(){
@@ -789,6 +791,24 @@
       state.difficulty = null;
       document.getElementById("startBtn").disabled = true;
     }
+    updateModeHighscoreLabel();
+  }
+
+  // モード選択画面：モード・なんいどが両方決まったら、その組み合わせの
+  // 自己ベストタイムをスタートボタンの上に表示する（未選択なら非表示）。
+  function updateModeHighscoreLabel(){
+    const el = document.getElementById("modeHighscoreLabel");
+    if(!el) return;
+    if(!state.mode || !state.difficulty){
+      el.classList.remove("show");
+      el.innerHTML = "";
+      return;
+    }
+    const rec = getHighScore(state.currentUser.id, state.mode, state.difficulty);
+    el.innerHTML = rec
+      ? "🏅 じぶんの ベストタイム：<strong>" + fmtTime(rec.timeSec) + "</strong>"
+      : "🏅 じぶんの ベストタイム：まだ きろくがありません";
+    el.classList.add("show");
   }
 
   /* ---------- スタンプパネル（過去の結果 画面） ---------- */
@@ -815,6 +835,14 @@
     const mm = d.getMonth()+1, dd = d.getDate();
     const hh = String(d.getHours()).padStart(2,"0"), mi = String(d.getMinutes()).padStart(2,"0");
     return mm+"/"+dd+" "+hh+":"+mi;
+  }
+
+  // 過去の結果画面の各なんいどブロックに出す、自己ベストタイムの小さなバッジ
+  function bestHtml(userId, mode, diff){
+    const rec = getHighScore(userId, mode, diff);
+    return rec
+      ? '<span class="history-diff-best">🏅 ベスト ' + fmtTime(rec.timeSec) + '</span>'
+      : '<span class="history-diff-best none">ベスト —</span>';
   }
 
   function renderHistory(){
@@ -859,8 +887,13 @@
         }
 
         block.innerHTML =
-          '<div class="history-diff-title">' + DIFF_LABELS[diff] +
-          '<span class="history-diff-count">' + sessions.length + ' / ' + MAX_RESULTS_PER_BUCKET + '件</span></div>' +
+          '<div class="history-diff-title">' +
+            '<span class="history-diff-label">' + DIFF_LABELS[diff] + '</span>' +
+            '<span class="history-diff-right">' +
+              bestHtml(state.currentUser.id, mode, diff) +
+              '<span class="history-diff-count">' + sessions.length + ' / ' + MAX_RESULTS_PER_BUCKET + '件</span>' +
+            '</span>' +
+          '</div>' +
           rowsHtml;
         modeSection.appendChild(block);
       });
@@ -1005,9 +1038,10 @@
       playStampSound();
     }
 
-    setTimeout(()=>{
+    // 時間経過での自動非表示はやめて、タップで閉じるまで演出を表示し続ける
+    overlay.onclick = ()=>{
       overlay.classList.remove("show");
-    }, isNewRecord ? 5200 : 4400);
+    };
   }
 
   /* ---------- とちゅう終了（けいさん画面の✕ボタン） ---------- */
@@ -1053,9 +1087,11 @@
         '<div class="hs-time">' + fmtTime(entry.timeSec) + '</div>';
     } else {
       el.className = "highscore-banner";
-      el.innerHTML =
-        '<div class="hs-left"><div class="hs-title">🏅 ベストタイム</div></div>' +
-        '<div class="hs-time">' + fmtTime(prevRecord.timeSec) + '</div>';
+      el.innerHTML = prevRecord
+        ? ('<div class="hs-left"><div class="hs-title">🏅 ベストタイム</div></div>' +
+           '<div class="hs-time">' + fmtTime(prevRecord.timeSec) + '</div>')
+        : '<div class="hs-left"><div class="hs-title">🏅 ベストタイムは まだ ありません</div>' +
+          '<div class="hs-prev">はんぶんいじょう せいかいすると きろくされます</div></div>';
     }
   }
 
@@ -1082,21 +1118,28 @@
     };
     saveUserSession(state.currentUser.id, session);
 
-    // ハイスコア（そのモード×なんいどで一番速いタイム）の判定・更新
-    // ※とちゅう終了（abortSession）では判定しない＝最後まで解き切ったときだけが対象
-    const prevRecord = getHighScore(state.currentUser.id, state.mode, state.difficulty);
-    const newRecordEntry = { timeSec: roundedTime, correctCount: correctCount, totalCount: state.totalQuestions, date: nowIso };
-    const isNewRecord = tryUpdateHighScore(state.currentUser.id, state.mode, state.difficulty, newRecordEntry);
-
-    // 問題数の半分以上正解でスタンプを1つ加算（満点ならワンランク良いスタンプになる）
+    // 問題数の半分以上正解のときだけスタンプを1つ加算（満点ならワンランク良いスタンプになる）
     const isPerfect = correctCount === state.totalQuestions;
     const earnsStamp = correctCount >= Math.ceil(state.totalQuestions/2);
+
+    // ハイスコア（そのモード×なんいどで一番速いタイム）の判定・更新は、
+    // 通常のスタンプがもらえる（＝半分以上正解の）ときだけ行う。
+    // 全問不正解などタイムだけ稼ぐような不正な更新を防ぐため、
+    // 半分未満の正解では記録の判定も更新も一切行わない。
+    const prevRecord = getHighScore(state.currentUser.id, state.mode, state.difficulty);
+    let isNewRecord = false;
+    let newRecordEntry = null;
+    if(earnsStamp){
+      newRecordEntry = { timeSec: roundedTime, correctCount: correctCount, totalCount: state.totalQuestions, date: nowIso };
+      isNewRecord = tryUpdateHighScore(state.currentUser.id, state.mode, state.difficulty, newRecordEntry);
+    }
+
     if(earnsStamp){
       addStamp(state.currentUser.id, isPerfect ? "perfect" : "normal");
-    }
-    // ハイスコア更新ボーナス：更新できたときだけスタンプ+3（通常の1とあわせて最大4個）
-    if(isNewRecord){
-      for(let i=0;i<3;i++) addStamp(state.currentUser.id, "record");
+      // ハイスコア更新ボーナス：通常のスタンプがもらえた回で、かつ更新できたときだけスタンプ+3（合計4個）
+      if(isNewRecord){
+        for(let i=0;i<3;i++) addStamp(state.currentUser.id, "record");
+      }
     }
 
     document.getElementById("resultTitle").textContent =
